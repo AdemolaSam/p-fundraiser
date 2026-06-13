@@ -1,32 +1,38 @@
-// lib.rs
-#![no_std]
+#![allow(unexpected_cfgs)]
 
 use pinocchio::{
-    account_info::AccountInfo,
-    entrypoint,
-    program_error::ProgramError,
-    pubkey::Pubkey,
-    ProgramResult,
+    AccountView, Address, ProgramResult, address::declare_id, entrypoint, error::ProgramError,
 };
-use pinocchio_pubkey::declare_id;
 
+use crate::instructions::FundraiserInstructions;
+
+mod constants;
+mod error;
+mod instructions;
 mod state;
 
 entrypoint!(process_instruction);
 
-pub mod instructions;
-pub use instructions::*;
-
 declare_id!("BHxV2zsi55UNqDL4ns2e6iyQWTJj78qeyRYcc9N4RoT1");
 
 fn process_instruction(
-    _program_id: &Pubkey,
-    accounts: &[AccountInfo],
+    program_id: &Address,
+    accounts: &mut [AccountView],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    match instruction_data.split_first() {
-        // Some((Deposit::DISCRIMINATOR, data)) => Deposit::try_from((data, accounts))?.process(),
-        // Some((Withdraw::DISCRIMINATOR, _)) => Withdraw::try_from(accounts)?.process(),
-        _ => Err(ProgramError::InvalidInstructionData),
+    assert_eq!(program_id, &ID);
+
+    let (discriminator, data) = instruction_data
+        .split_first()
+        .ok_or(ProgramError::InvalidInstructionData)?;
+
+    match FundraiserInstructions::try_from(discriminator)? {
+        FundraiserInstructions::Initialize => instructions::process_initialize(accounts, data),
+
+        FundraiserInstructions::Contribute => instructions::process_contribute(accounts, data),
+
+        FundraiserInstructions::Refund => instructions::process_refund(accounts, data),
+
+        FundraiserInstructions::Withdraw => instructions::process_withdraw(accounts, data),
     }
 }
